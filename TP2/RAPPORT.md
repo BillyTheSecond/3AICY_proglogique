@@ -17,3 +17,10 @@ Un seul panier abandoné dans les 24 heures.
 ![alt text](image-3.png)
 
 ![alt text](image-4.png)
+
+## Règle 5
+TODO: Faire en sorte d'avoir des données en sortie
+
+## Règle 6
+
+![alt text](image-5.png)

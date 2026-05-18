@@ -220,6 +220,39 @@ suggestions_produits_complementaires(Suggestions) :-
     ),
     sort(SuggestionsAvecDoublons, Suggestions).
 
+% Regle metier 5 :
+% demander un avis aux clients une semaine apres un achat.
+relance_avis_client(Email, ProduitAchete) :-
+    aujourdhui(Aujourdhui),
+    achat(IDClient, ProduitAchete, JourAchat, _),
+    difference_jours(Aujourdhui, JourAchat, Difference),
+    Difference =:= 7,
+    client(IDClient, Email, _).
+
+demandes_avis_clients(Demandes) :-
+    findall(
+        demande_avis(Email, ProduitAchete),
+        relance_avis_client(Email, ProduitAchete),
+        DemandesAvecDoublons
+    ),
+    sort(DemandesAvecDoublons, Demandes).
+
+% Regle metier 6 :
+% informer les clients lorsqu'un produit consulte est de nouveau en stock.
+relance_retour_stock(Email, ProduitConsulte) :-
+    consulte(IDClient, ProduitConsulte, _),
+    stock(NbElements, ProduitConsulte),
+    NbElements > 0,
+    client(IDClient, Email, _).
+
+emails_retour_stock(Relances) :-
+    findall(
+        retour_stock(Email, ProduitConsulte),
+        relance_retour_stock(Email, ProduitConsulte),
+        RelancesAvecDoublons
+    ),
+    sort(RelancesAvecDoublons, Relances).
+
 
 
 
@@ -252,3 +285,8 @@ suggestions_produits_complementaires(Suggestions) :-
 % ProduitComplementaire = 'souris sans fil'.
 %
 % ?- suggestions_produits_complementaires(Suggestions).
+%
+% ?- demandes_avis_clients(Demandes).
+% Demandes = [].
+%
+% ?- emails_retour_stock(Relances).
