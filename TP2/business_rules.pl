@@ -5,7 +5,7 @@ aujourdhui(20260518).
 
 % Clients
 % client(ID_Client, Email, DateNaissance).
-client(1, 'clientA@fri.com', 20060123).
+client(1, 'clientA@fri.com', 20060525).
 client(2, 'clientB@fri.com', 20060328).
 client(3, 'clientC@rouge.com', 20160426).
 client(4, 'clientD@rouge.com', 19480526).
@@ -138,6 +138,23 @@ difference_jours(DateFin, DateDebut, Difference) :-
     horodatage_date(DateDebut, HorodatageDebut),
     Difference is round((HorodatageFin - HorodatageDebut) / 86400).
 
+date_anniversaire(DateNaissance, Annee, DateAnniversaire) :-
+    MoisJour is DateNaissance mod 10000,
+    DateAnniversaire is Annee * 10000 + MoisJour.
+
+prochain_anniversaire(DateNaissance, DateReference, ProchainAnniversaire) :-
+    AnneeReference is DateReference // 10000,
+    date_anniversaire(DateNaissance, AnneeReference, AnniversaireCetteAnnee),
+    AnniversaireCetteAnnee >= DateReference,
+    ProchainAnniversaire is AnniversaireCetteAnnee.
+
+prochain_anniversaire(DateNaissance, DateReference, ProchainAnniversaire) :-
+    AnneeReference is DateReference // 10000,
+    AnneeSuivante is AnneeReference + 1,
+    date_anniversaire(DateNaissance, AnneeReference, AnniversaireCetteAnnee),
+    AnniversaireCetteAnnee < DateReference,
+    date_anniversaire(DateNaissance, AnneeSuivante, ProchainAnniversaire).
+
 % Regle metier 1 :
 % envoyer un email de relance aux clients qui ont abandonne leur panier dans les 24 heures.
 relance_panier_abandonne(Email) :-
@@ -152,6 +169,10 @@ relance_panier_abandonne(Email) :-
 emails_relance_panier(Emails) :-
     findall(Email, relance_panier_abandonne(Email), Emails).
 
+
+
+
+
 % Regle metier 2 :
 % envoyer un email promotionnel aux clients qui n'ont pas effectue d'achat depuis 30 jours.
 relance_client_inactif(Email) :-
@@ -163,6 +184,24 @@ relance_client_inactif(Email) :-
 
 emails_relance_clients_inactifs(Emails) :-
     findall(Email, relance_client_inactif(Email), Emails).
+
+% Regle metier 3 :
+% envoyer un email avec une offre speciale une semaine avant l'anniversaire.
+relance_anniversaire(Email) :-
+    aujourdhui(Aujourdhui),
+    client(_, Email, DateNaissance),
+    prochain_anniversaire(DateNaissance, Aujourdhui, ProchainAnniversaire),
+    difference_jours(ProchainAnniversaire, Aujourdhui, Difference),
+    Difference =:= 7.
+
+emails_relance_anniversaire(Emails) :-
+    findall(Email, relance_anniversaire(Email), Emails).
+
+
+
+
+
+
 
 % Tests effectués dans SWI-Prolog :
 % ?- relance_panier_abandonne(Email).
@@ -177,3 +216,6 @@ emails_relance_clients_inactifs(Emails) :-
 %
 % ?- emails_relance_clients_inactifs(Emails).
 % Emails = ['clientC@rouge.com', 'clientG@ahoel.com'].
+%
+% ?- emails_relance_anniversaire(Emails).
+% Emails = [].
