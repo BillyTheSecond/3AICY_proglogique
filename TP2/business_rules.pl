@@ -197,6 +197,29 @@ relance_anniversaire(Email) :-
 emails_relance_anniversaire(Emails) :-
     findall(Email, relance_anniversaire(Email), Emails).
 
+achat_unique(IDClient, ProduitAchete) :-
+    setof(
+        Produit,
+        DateAchat^Montant^achat(IDClient, Produit, DateAchat, Montant),
+        ProduitsAchetes
+    ),
+    member(ProduitAchete, ProduitsAchetes).
+
+% Regle metier 4 :
+% suggerer des produits complementaires aux clients qui ont achete un produit.
+relance_produit_complementaire(Email, ProduitAchete, ProduitComplementaire) :-
+    achat_unique(IDClient, ProduitAchete),
+    produit_complementaire(ProduitAchete, ProduitComplementaire),
+    client(IDClient, Email, _).
+
+suggestions_produits_complementaires(Suggestions) :-
+    findall(
+        suggestion(Email, ProduitAchete, ProduitComplementaire),
+        relance_produit_complementaire(Email, ProduitAchete, ProduitComplementaire),
+        SuggestionsAvecDoublons
+    ),
+    sort(SuggestionsAvecDoublons, Suggestions).
+
 
 
 
@@ -219,3 +242,13 @@ emails_relance_anniversaire(Emails) :-
 %
 % ?- emails_relance_anniversaire(Emails).
 % Emails = [].
+%
+% ?- relance_produit_complementaire(Email, ProduitAchete, ProduitComplementaire).
+% Email = 'clientA@fri.com',
+% ProduitAchete = 'ordinateur portable',
+% ProduitComplementaire = 'sacoche pour ordinateur' ;
+% Email = 'clientA@fri.com',
+% ProduitAchete = 'ordinateur portable',
+% ProduitComplementaire = 'souris sans fil'.
+%
+% ?- suggestions_produits_complementaires(Suggestions).
