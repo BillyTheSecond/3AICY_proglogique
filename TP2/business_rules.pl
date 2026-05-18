@@ -126,6 +126,18 @@ aujourdhui_court(JourCourt) :-
     aujourdhui(JourComplet),
     date_courte(JourComplet, JourCourt).
 
+% Calcule une vraie difference en jours entre deux dates au format YYYYMMDD.
+horodatage_date(Date, Horodatage) :-
+    Annee is Date // 10000,
+    Mois is (Date // 100) mod 100,
+    Jour is Date mod 100,
+    date_time_stamp(date(Annee, Mois, Jour, 0, 0, 0, 0, -, -), Horodatage).
+
+difference_jours(DateFin, DateDebut, Difference) :-
+    horodatage_date(DateFin, HorodatageFin),
+    horodatage_date(DateDebut, HorodatageDebut),
+    Difference is round((HorodatageFin - HorodatageDebut) / 86400).
+
 % Regle metier 1 :
 % envoyer un email de relance aux clients qui ont abandonne leur panier dans les 24 heures.
 relance_panier_abandonne(Email) :-
@@ -140,9 +152,28 @@ relance_panier_abandonne(Email) :-
 emails_relance_panier(Emails) :-
     findall(Email, relance_panier_abandonne(Email), Emails).
 
-% Tests a lancer dans SWI-Prolog :
+% Regle metier 2 :
+% envoyer un email promotionnel aux clients qui n'ont pas effectue d'achat depuis 30 jours.
+relance_client_inactif(Email) :-
+    aujourdhui(Aujourdhui),
+    dernier_achat(IDClient, JourDernierAchat),
+    difference_jours(Aujourdhui, JourDernierAchat, Difference),
+    Difference >= 30,
+    client(IDClient, Email, _).
+
+emails_relance_clients_inactifs(Emails) :-
+    findall(Email, relance_client_inactif(Email), Emails).
+
+% Tests effectués dans SWI-Prolog :
 % ?- relance_panier_abandonne(Email).
 % Email = 'clientA@fri.com'.
 %
 % ?- emails_relance_panier(Emails).
 % Emails = ['clientA@fri.com'].
+%
+% ?- relance_client_inactif(Email).
+% Email = 'clientC@rouge.com' ;
+% Email = 'clientG@ahoel.com'.
+%
+% ?- emails_relance_clients_inactifs(Emails).
+% Emails = ['clientC@rouge.com', 'clientG@ahoel.com'].
