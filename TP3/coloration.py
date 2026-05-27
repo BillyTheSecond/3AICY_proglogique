@@ -128,7 +128,7 @@ if __name__ == "__main__":
 """
 J'ai tenté avec 5 couleurs, 4 couleurs puis 3.
 
-Pour 3 couleurs, on obtient une résolution impossible"Pas de solution"
+Pour 3 couleurs, on obtient une résolution impossible "Pas de solution"
 
 Donc 4 est la valeur minimale de k possible pour ce problème.
 
