@@ -254,12 +254,114 @@ emails_retour_stock(Relances) :-
     sort(RelancesAvecDoublons, Relances).
 
 
+mois_achat(Date, Mois) :-
+    Mois is Date // 100.
+
+calcul_somme([], 0).
+
+calcul_somme([Tete|Reste], Somme) :-
+    calcul_somme(Reste, SommeReste),
+    Somme is Tete + SommeReste.
+
+% Regle metier 7 :
+% relance si un client achete un meme type de produit plus de deux fois dans un mois
+relance_comportement_achat(Email, Categorie, ProduitComplementaire) :-
+    categorie(Categorie),
+    achat(IDClient, Categorie, UneDate, _),
+    mois_achat(UneDate, Mois),
+    findall(
+        DateAchat,
+        (
+            achat(IDClient, Categorie, DateAchat, _),
+            mois_achat(DateAchat, Mois)
+        ),
+        AchatsDuMois
+    ),
+    length(AchatsDuMois, NombreAchats),
+    NombreAchats > 2,
+    produit_complementaire(Categorie, ProduitComplementaire),
+    client(IDClient, Email, _).
+
+emails_comportement_achat(Relances) :-
+    findall(
+        comportement_achat(Email, Categorie, ProduitComplementaire),
+        relance_comportement_achat(Email, Categorie, ProduitComplementaire),
+        RelancesAvecDoublons
+    ),
+    sort(RelancesAvecDoublons, Relances).
+
+% Regle metier 8 :
+% relance pour les clients qui ont une note de satisfaction trop basse.
+relance_satisfaction(Email, Score) :-
+    satisfaction(IDClient, Score),
+    Score < 7,
+    client(IDClient, Email, _).
+
+emails_satisfaction(Relances) :-
+    findall(
+        satisfaction_faible(Email, Score),
+        relance_satisfaction(Email, Score),
+        Relances
+    ).
+
+% Regle metier 9 :
+% relance si un client consulte beaucoup un produit sans acheter
+relance_navigation(Email, ProduitConsulte) :-
+    consulte(IDClient, ProduitConsulte, _),
+    findall(
+        DateConsultation,
+        consulte(IDClient, ProduitConsulte, DateConsultation),
+        Consultations
+    ),
+    length(Consultations, NombreConsultations),
+    NombreConsultations > 2,
+    \+ achat(IDClient, ProduitConsulte, _, _),
+    client(IDClient, Email, _).
+
+emails_navigation(Relances) :-
+    findall(
+        navigation(Email, ProduitConsulte),
+        relance_navigation(Email, ProduitConsulte),
+        RelancesAvecDoublons
+    ),
+    sort(RelancesAvecDoublons, Relances).
+
+panier_moyen_trois_mois(IDClient, Moyenne) :-
+    aujourdhui(Aujourdhui),
+    client(IDClient, _, _),
+    findall(
+        Montant,
+        (
+            achat(IDClient, _, JourAchat, Montant),
+            difference_jours(Aujourdhui, JourAchat, Difference),
+            Difference >= 0,
+            Difference =< 90
+        ),
+        Montants
+    ),
+    length(Montants, NombreAchats),
+    NombreAchats > 0,
+    calcul_somme(Montants, Somme),
+    Moyenne is Somme / NombreAchats.
+
+% Regle metier 10 :
+% relance fidelite pour les clients avec un panier moyen de plus de 500 euros
+relance_panier_moyen(Email, Moyenne) :-
+    panier_moyen_trois_mois(IDClient, Moyenne),
+    Moyenne > 500,
+    client(IDClient, Email, _).
+
+emails_panier_moyen(Relances) :-
+    findall(
+        panier_moyen(Email, Moyenne),
+        relance_panier_moyen(Email, Moyenne),
+        Relances
+    ).
 
 
 
-
-
-% Tests effectués dans SWI-Prolog :
+% On garde trace des tests Prolog effectués pour le rapport
+%
 % ?- relance_panier_abandonne(Email).
 % Email = 'clientA@fri.com'.
 %
@@ -290,3 +392,15 @@ emails_retour_stock(Relances) :-
 % Demandes = [].
 %
 % ?- emails_retour_stock(Relances).
+%
+% ?- emails_comportement_achat(Relances).
+% Relances = [].
+%
+% ?- emails_satisfaction(Relances).
+% Relances = [satisfaction_faible('clientA@fri.com', 6), satisfaction_faible('clientG@ahoel.com', 5), satisfaction_faible('clientH@ahoel.com', 6), satisfaction_faible('clientI@jaimail.com', 6)].
+%
+% ?- emails_navigation(Relances).
+% Relances = [navigation('clientC@rouge.com', 'console de jeux')].
+%
+% ?- emails_panier_moyen(Relances).
+% Relances = [panier_moyen('clientF@wanadou.com', 890)].
