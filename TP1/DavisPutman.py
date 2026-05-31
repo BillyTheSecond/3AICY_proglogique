@@ -224,42 +224,214 @@ def DP(clauses:list)->bool:
     """retourne vrai si le DPLL est fini"""
     global cpt
     cpt +=1
-    print("résolution de ", clauses)
     clr1 = regle_1(clauses)
     if len(clr1) == 0: 
-        print("succes")
         return True
     if [] in clr1: 
-        print("echec")
         return False
     clr2 = regle_2(clr1)
     if len(clr2) == 0: 
-        print("succes")
         return True
     if [] in clr2: 
-        print("echec")
         return False
     if not formules_egales(clr1, clr2): return DP(clr2)
     clr3 = regle_3(clr2)
     if len(clr3) == 0: 
-        print("succes")
         return True
     if [] in clr3:  
-        print("echec")
         return False
     if not formules_egales(clr2, clr3): return DP(clr3)
     clr4 = regle_4(clr3)
     if len(clr4) == 0:  
-        print("succes")
         return True
     if [] in clr4: 
-        print("echec")
         return False
     if not formules_egales(clr3, clr4): return DP(clr4)
     clr51,clr52 = regle_5(clr4)
     mondes_unis = DP(clr51) or DP(clr52)
-    print("fin résolution de ", clauses)
     return mondes_unis
+
+
+def variables_de_formule(clauses:list)->list:
+    variables = set()
+    for c in clauses:
+        for lit in c:
+            variables.add(abs(lit))
+    return sorted(variables)
+
+
+def simplifie_par_litteral(clauses:list, literal:int)->list:
+    """on suppose literal vrai et on simplifie la formule"""
+    clauses2 = []
+    for c in clauses:
+        if literal in c:
+            continue
+        c2 = [i for i in c if i != -literal]
+        clauses2.append(c2)
+    return clauses2
+
+
+def premier_unitaire(clauses:list)->int:
+    for c in clauses:
+        if len(c) == 1:
+            return c[0]
+    return 0
+
+
+def premier_pur(clauses:list)->int:
+    purs = multiple_lit(clauses)
+    if purs:
+        return purs[0]
+    return 0
+
+
+def choix_dpll(clauses:list)->int:
+    """choix du literal pour couper en deux cas"""
+    l = get_not_single(clauses)
+    if l != 0:
+        return l
+    for c in clauses:
+        if len(c) > 0:
+            return c[0]
+    return 0
+
+
+cpt_dpll = 0
+
+
+def DPLL(clauses:list)->bool:
+    """version DPLL, un peu plus directe que DP"""
+    global cpt_dpll
+    cpt_dpll += 1
+
+    if [] in clauses:
+        return False
+    if len(clauses) == 0:
+        return True
+
+    l = premier_unitaire(clauses)
+    if l != 0:
+        return DPLL(simplifie_par_litteral(clauses, l))
+
+    l = premier_pur(clauses)
+    if l != 0:
+        return DPLL(simplifie_par_litteral(clauses, l))
+
+    l = choix_dpll(clauses)
+    return DPLL(simplifie_par_litteral(clauses, l)) or DPLL(simplifie_par_litteral(clauses, -l))
+
+
+def ajoute_au_modele(modele:dict, literal:int):
+    variable = abs(literal)
+    valeur = literal > 0
+    if variable in modele and modele[variable] != valeur:
+        return None
+    modele2 = modele.copy()
+    modele2[variable] = valeur
+    return modele2
+
+
+def modele_en_liste(modele:dict)->list:
+    resultat = []
+    for variable in sorted(modele):
+        if modele[variable]:
+            resultat.append(variable)
+        else:
+            resultat.append(-variable)
+    return resultat
+
+
+def DPLL_modele_rec(clauses:list, modele:dict):
+    if [] in clauses:
+        return None
+    if len(clauses) == 0:
+        return modele
+
+    l = premier_unitaire(clauses)
+    if l != 0:
+        modele2 = ajoute_au_modele(modele, l)
+        if modele2 is None:
+            return None
+        return DPLL_modele_rec(simplifie_par_litteral(clauses, l), modele2)
+
+    l = premier_pur(clauses)
+    if l != 0:
+        modele2 = ajoute_au_modele(modele, l)
+        if modele2 is None:
+            return None
+        return DPLL_modele_rec(simplifie_par_litteral(clauses, l), modele2)
+
+    l = choix_dpll(clauses)
+
+    modele_positif = ajoute_au_modele(modele, l)
+    if modele_positif is not None:
+        resultat = DPLL_modele_rec(simplifie_par_litteral(clauses, l), modele_positif)
+        if resultat is not None:
+            return resultat
+
+    modele_negatif = ajoute_au_modele(modele, -l)
+    if modele_negatif is not None:
+        return DPLL_modele_rec(simplifie_par_litteral(clauses, -l), modele_negatif)
+
+    return None
+
+
+def DPLL_modele(clauses:list)->list:
+    resultat = DPLL_modele_rec(clauses, {})
+    if resultat is None:
+        return []
+    return modele_en_liste(resultat)
+
+
+def complete_modele(modele:dict, variables:list)->list:
+    """si une variable n'est pas decidée, on met les deux cas possibles"""
+    if len(variables) == 0:
+        return [modele]
+
+    variable = variables[0]
+    reste = variables[1:]
+
+    if variable in modele:
+        return complete_modele(modele, reste)
+
+    modele_vrai = modele.copy()
+    modele_vrai[variable] = True
+    modele_faux = modele.copy()
+    modele_faux[variable] = False
+    return complete_modele(modele_vrai, reste) + complete_modele(modele_faux, reste)
+
+
+def tous_les_modeles_rec(clauses:list, modele:dict, variables:list)->list:
+    if [] in clauses:
+        return []
+    if len(clauses) == 0:
+        modeles_complets = complete_modele(modele, variables)
+        return [modele_en_liste(m) for m in modeles_complets]
+
+    l = premier_unitaire(clauses)
+    if l != 0:
+        modele2 = ajoute_au_modele(modele, l)
+        if modele2 is None:
+            return []
+        return tous_les_modeles_rec(simplifie_par_litteral(clauses, l), modele2, variables)
+
+    l = choix_dpll(clauses)
+    modeles = []
+
+    modele_positif = ajoute_au_modele(modele, l)
+    if modele_positif is not None:
+        modeles += tous_les_modeles_rec(simplifie_par_litteral(clauses, l), modele_positif, variables)
+
+    modele_negatif = ajoute_au_modele(modele, -l)
+    if modele_negatif is not None:
+        modeles += tous_les_modeles_rec(simplifie_par_litteral(clauses, -l), modele_negatif, variables)
+
+    return modeles
+
+
+def tous_les_modeles(clauses:list)->list:
+    variables = variables_de_formule(clauses)
+    return tous_les_modeles_rec(clauses, {}, variables)
 
 
 def lire_cnf(fichier):
@@ -317,26 +489,53 @@ exo3 = [[a,b], [-a, c], [-b, d], [-c, p], [-d, p], [-p, -c]]
 
 
 def __main__():
-    global cpt
-    cpt = 0
+    global cpt, cpt_dpll
 
-    def run_and_report(nom, formule):
-        global cpt
+    print("Tests sur les exemples du code")
+
+    for nom, formule in [("exo 2", exo2), ("exo 3", exo3), ("exo 4", exo4)]:
         cpt = 0
         debut = time.perf_counter()
         resultat = DP(formule)
         duree = time.perf_counter() - debut
         print(nom, ": ", resultat, " avec ", cpt, " appels à DP en ", round(duree, 6), "s")
 
-    run_and_report("exo 2", exo2)
-    run_and_report("exo 3", exo3)
-    run_and_report("exo 4", exo4)
+    for nom, formule in [("exo 2", exo2), ("exo 3", exo3), ("exo 4", exo4)]:
+        cpt_dpll = 0
+        debut = time.perf_counter()
+        resultat = DPLL(formule)
+        duree = time.perf_counter() - debut
+        print(nom, ": ", resultat, " avec ", cpt_dpll, " appels à DPLL en ", round(duree, 6), "s")
 
-    # lire les fichiers .cnf dans /uf50 et les résoudre
-    for i in range(1, 10):
-        clauses = lire_cnf(f"./uf50/uf50-0{i}.cnf")
+    print()
+    print("Exemple de modele")
+    print("modele exo 3 :", DPLL_modele(exo3))
+
+    print()
+    print("Tous les modeles d'une petite formule")
+    petite_formule = [[1, 2], [-1, 2]]
+    print(petite_formule, ":", tous_les_modeles(petite_formule))
+
+    print()
+    print("Tests sur les fichiers uf50 presents")
+    for nom_fichier in ["uf50-01.cnf", "uf50-02.cnf", "uf50-03.cnf"]:
+        clauses = lire_cnf("TP1/uf50/" + nom_fichier)
+
         cpt = 0
-        print(f"uf50-0{i} : ", DP(clauses), " avec ", cpt, " appels à DP")
+        debut = time.perf_counter()
+        resultat = DP(clauses)
+        duree = time.perf_counter() - debut
+        print(nom_fichier, "avec DP : ", resultat, " avec ", cpt, " appels à DP en ", round(duree, 6), "s")
+
+        cpt_dpll = 0
+        debut = time.perf_counter()
+        resultat = DPLL(clauses)
+        duree = time.perf_counter() - debut
+        print(nom_fichier, "avec DPLL : ", resultat, " avec ", cpt_dpll, " appels à DPLL en ", round(duree, 6), "s")
+
+    print()
+    print("Tests uuf50 et uuf150")
+    print("Je n'ai pas les fichiers dans le dossier, donc le code est pret mais je ne peux pas les lancer.")
 
 if __name__ == "__main__":
     start_time = time.time()
